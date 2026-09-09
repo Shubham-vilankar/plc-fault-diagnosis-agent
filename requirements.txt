@@ -1,0 +1,35 @@
+# --- Core / RAG ---
+langchain>=0.3.0
+langchain-community>=0.3.0
+qdrant-client>=1.10.0
+sentence-transformers>=3.0.0
+unstructured>=0.15.0        # PDF/manual parsing
+pypdf>=4.0.0
+
+# --- Agents ---
+crewai>=0.70.0
+crewai-tools>=0.12.0
+
+# --- Model serving / inference ---
+vllm>=0.6.0                 # or use llama-cpp-python if you prefer GGUF
+transformers>=4.44.0
+accelerate>=0.33.0
+
+# --- Fine-tuning (QLoRA) ---
+peft>=0.12.0
+trl>=0.9.6
+bitsandbytes>=0.43.0
+datasets>=2.20.0
+
+# --- Evaluation / observability ---
+langfuse>=2.36.0
+ragas>=0.1.9                # RAG faithfulness/relevance metrics
+
+# --- Serving / API ---
+fastapi>=0.112.0
+uvicorn>=0.30.0
+
+# --- Utils ---
+python-dotenv>=1.0.1
+pyyaml>=6.0.1
+pandas>=2.2.0

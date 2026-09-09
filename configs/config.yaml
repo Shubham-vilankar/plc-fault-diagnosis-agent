@@ -1,0 +1,52 @@
+# Central config — keep all tunable settings here, not hardcoded in scripts.
+
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  sft_data: data/sft
+  vector_store: data/processed/qdrant
+
+model:
+  base_model: "Qwen/Qwen2.5-14B-Instruct"
+  quantization: "4bit"           # bitsandbytes NF4
+  finetuned_adapter_path: "data/sft/qlora-adapter"
+  fallback_model: "Qwen/Qwen2.5-7B-Instruct"   # for fast local iteration
+
+embeddings:
+  model: "BAAI/bge-small-en-v1.5"
+
+vector_db:
+  provider: "qdrant"
+  collection_name: "plc_fault_kb"
+  host: "localhost"
+  port: 6333
+
+finetuning:
+  method: "qlora"
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  learning_rate: 2e-4
+  epochs: 3
+  batch_size: 4
+  gradient_accumulation_steps: 4
+
+agents:
+  framework: "crewai"
+  roles:
+    - retriever
+    - diagnostician
+    - escalator
+  escalation_confidence_threshold: 0.6
+
+serving:
+  local_server: "vllm"           # or "llama.cpp"
+  local_port: 8001
+  lambda_orchestration: true
+
+cloud_baseline:
+  provider: "groq"
+  model: "llama-3.1-70b-versatile"
+
+observability:
+  langfuse_host: "http://localhost:3000"   # self-hosted

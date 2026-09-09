@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+data/raw/company/          # never commit real company docs, even sanitized
+data/processed/qdrant/
+data/sft/qlora-adapter/
+*.gguf
+*.safetensors
+.venv/
+venv/
