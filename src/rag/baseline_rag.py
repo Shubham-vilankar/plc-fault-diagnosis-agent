@@ -1,21 +1,19 @@
-"""
-Stage 2: Baseline RAG — retrieval + base model, NO fine-tuning, NO agent.
-
-This is your control group for the eventual three-way evaluation ablation
-(base+RAG, fine-tuned-no-RAG, fine-tuned+RAG). Get this working end-to-end
-FIRST before touching fine-tuning or CrewAI — it de-risks everything after it
-and gives you a working demo early.
-
-TODO (you):
-  - Point EMBEDDING_MODEL / vector DB at your populated Qdrant collection
-  - Swap the placeholder prompt for something tuned to fault-diagnosis output
-    (structured: likely cause / confidence / remedy steps / when to escalate)
-"""
-
-import yaml
+import sys
 from pathlib import Path
 
-CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "config.yaml"
+import torch
+import yaml
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+"""
+Stage 2: Baseline RAG — retrieval + base model, NO fine-tuning, NO agent
+it Loads the base model directly via transformers + 4-bit quantization for simplicity.
+"""
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CONFIG_PATH = PROJECT_ROOT / "configs" / "config.yaml"
 
 
 def load_config() -> dict:
@@ -32,6 +30,10 @@ retrieved reference material below, respond in this structure:
 3. Remedy Steps
 4. Escalate to a technician? (yes/no, with reason)
 
+If the reference material doesn't clearly cover the query, say so honestly \
+rather than guessing — a wrong confident answer is worse than admitting \
+uncertainty here.
+
 Reference material:
 {context}
 
@@ -39,31 +41,81 @@ Query: {query}
 """
 
 
-def retrieve(query: str, top_k: int = 5) -> list[str]:
-    """
-    Retrieve top_k relevant chunks from Qdrant for the query.
-    TODO: qdrant_client search against the collection defined in config.yaml
-    """
-    raise NotImplementedError
+class BaselineRAG:
+    """Loads embedder, Qdrant client, and the base LLM once """
 
+    def __init__(self, config: dict, use_fallback_model: bool = True):
+        self.config = config
+        vector_store_path = PROJECT_ROOT / config["paths"]["vector_store"]
+        self.collection_name = config["vector_db"]["collection_name"]
 
-def generate(query: str, context_chunks: list[str]) -> str:
-    """
-    Call the base (non-fine-tuned) local model with the fault-diagnosis
-    prompt. TODO: wire up to your local vLLM/llama.cpp server (see
-    src/serve/) or a HF `transformers` pipeline for early testing.
-    """
-    prompt = FAULT_DIAGNOSIS_PROMPT.format(
-        context="\n\n".join(context_chunks), query=query
-    )
-    raise NotImplementedError
+        print("Loading embedder...")
+        self.embedder = SentenceTransformer(config["embeddings"]["model"])
 
+        print("Connecting to Qdrant...")
+        self.qdrant = QdrantClient(path=str(vector_store_path))
 
-def answer(query: str) -> str:
-    chunks = retrieve(query)
-    return generate(query, chunks)
+        model_name = (
+            config["model"]["fallback_model"]
+            if use_fallback_model
+            else config["model"]["base_model"]
+        )
+        print(f"Loading {model_name} in 4-bit on GPU (first run downloads the model, be patient)...")
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name, quantization_config=bnb_config, device_map="auto"
+        )
+        print("Model loaded.")
+
+    def retrieve(self, query: str, top_k: int = 5) -> list[str]:
+        query_vec = self.embedder.encode(query).tolist()
+        hits = self.qdrant.query_points(
+            collection_name=self.collection_name, query=query_vec, limit=top_k
+        ).points
+        return [hit.payload["content"] for hit in hits]
+
+    def generate(self, query: str, context_chunks: list[str]) -> str:
+        prompt = FAULT_DIAGNOSIS_PROMPT.format(
+            context="\n\n".join(context_chunks), query=query
+        )
+        messages = [{"role": "user", "content": prompt}]
+        inputs = self.tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True
+        ).to(self.model.device)
+
+        output = self.model.generate(
+            **inputs, max_new_tokens=400, temperature=0.3, do_sample=True
+        )
+        response = self.tokenizer.decode(
+            output[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True
+        )
+        return response
+
+    def answer(self, query: str, top_k: int = 5) -> dict:
+        chunks = self.retrieve(query, top_k=top_k)
+        response = self.generate(query, chunks)
+        return {"query": query, "retrieved_chunks": chunks, "response": response}
 
 
 if __name__ == "__main__":
-    test_query = "Stop code E402 on Siemens S7-1200, motor won't start"
-    print(answer(test_query))
+    config = load_config()
+    rag = BaselineRAG(config, use_fallback_model=True)
+
+    test_queries = [
+        "Stop code E402 on Siemens S7-1200, motor won't start",
+        "Communication module not working, what should I check?",
+    ]
+    for q in test_queries:
+        print(f"\n{'=' * 60}\nQuery: {q}\n{'=' * 60}")
+        result = rag.answer(q)
+        print("Retrieved context:")
+        for c in result["retrieved_chunks"][:3]:
+            print(f"  - {c[:100]}")
+        print(f"\nResponse:\n{result['response']}")
+
+    rag.qdrant.close()
