@@ -4,7 +4,7 @@ from pathlib import Path
 
 @dataclass
 class FaultDoc:
-    """One unit of knowledge: a fault code, stop code, or SOP section."""
+    """One unit of knowledge: ie- a fault code, stop code, or SOP section."""
     source: str              # "public" or "company"
     doc_type: str             # "fault_code" | "manual_section" | "sop"
     code: str | None = None   # e.g. "E402" — None for prose SOPs
@@ -15,26 +15,21 @@ class FaultDoc:
 
 def parse_fault_code_table(path: Path, source: str) -> list[FaultDoc]:
     """
-    Parse a fault-code table (CSV/Excel) into FaultDoc objects.
-    Keep code + description + remedy TOGETHER as one chunk — don't split
-    a fault code from its remedy, that destroys retrieval quality.
+    this function would Parse a fault-code table (CSV/Excel) into FaultDoc objects.
+    
     """
-    # TODO: pandas.read_csv / read_excel, one FaultDoc per row
     raise NotImplementedError
 
 
 def parse_manual_pdf(path: Path, source: str) -> list[FaultDoc]:
     """
-    Parse a PDF manual into section-level FaultDoc chunks.
-    Use `unstructured` for layout-aware parsing (tables, headers) rather
-    than raw pypdf text extraction, which loses structure.
+    this function would Parse a PDF manual into section-level FaultDoc chunks.
     """
-    # TODO: unstructured.partition.pdf.partition_pdf(path)
     raise NotImplementedError
 
 
 def load_all(raw_dir: Path) -> list[FaultDoc]:
-    """Walk data/raw/{public,company}/ and parse everything found."""
+    """Load all data/raw/{public,company}/ and parse everything found."""
     docs: list[FaultDoc] = []
     for source in ("public", "company"):
         source_dir = raw_dir / source
