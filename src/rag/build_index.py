@@ -1,12 +1,3 @@
-"""
-Stage 1b: Embed the parsed FaultDoc chunks and load them into Qdrant.
-
-Each FaultDoc is already one atomic unit (code + description + remedy kept
-together during parsing) — so there's no further splitting needed here,
-just embedding and upserting. Uses Qdrant's local file-based mode (no
-server/Docker required) — swap to a hosted/server client later by changing
-only the QdrantClient(...) line if you outgrow this.
-"""
 
 import sys
 from pathlib import Path
@@ -15,6 +6,16 @@ import yaml
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
+
+"""
+Stage 1b: Embed the parsed FaultDoc chunks and load them into Qdrant.
+
+Each FaultDoc is already one atomic unit (code + description + remedy kept
+together during parsing) — so there's no further splitting. 
+Using here Qdrant's local file-based mode (no
+server/Docker required).
+"""
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ingestion.load_documents import load_all, FaultDoc  # noqa: E402
