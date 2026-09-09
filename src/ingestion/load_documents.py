@@ -1,18 +1,3 @@
-"""
-Stage 1: Load raw fault-code manuals, SOPs, and stop-code references from
-data/raw/ into a normalized intermediate format before chunking.
-
-Expected raw formats: PDF manuals, CSV/Excel fault-code tables, plain text
-SOPs. Public sources (PLC vendor manuals, fault-code references) and your
-sanitized company docs should both land in data/raw/ — tag their source in
-metadata so you can filter or compare later.
-
-TODO (you):
-  - Drop your source files into data/raw/{public,company}/
-  - Fill in `parse_fault_code_table()` for CSV/Excel fault-code sheets
-  - Fill in `parse_manual_pdf()` for PDF manuals (unstructured / pypdf)
-"""
-
 from dataclasses import dataclass, field
 from pathlib import Path
 
