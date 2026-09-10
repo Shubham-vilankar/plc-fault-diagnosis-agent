@@ -26,7 +26,7 @@ finetuning:
   lora_r: 16
   lora_alpha: 32
   lora_dropout: 0.05
-  learning_rate: 2.0e-4      #<<--------------- Fixed the learning rate to 2.0e-4, earlier it was getting parsed the string "2e-4", not the float 0.0002
+  learning_rate: 2.0e-4
   epochs: 3
   batch_size: 4
   gradient_accumulation_steps: 4
@@ -38,6 +38,7 @@ agents:
     - diagnostician
     - escalator
   escalation_confidence_threshold: 0.6
+  out_of_scope_score_threshold: 0.55   # below this, treat as not a real fault-diagnosis query
 
 serving:
   local_server: "vllm"           # or "llama.cpp"
