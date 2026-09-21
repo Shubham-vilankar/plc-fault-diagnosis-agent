@@ -5,13 +5,6 @@ codes, combining retrieval-augmented generation, a QLoRA-fine-tuned local
 model, and a CrewAI multi-agent pipeline — with full observability and a
 local-GPU-vs-cloud-API cost/latency comparison.
 
-## Why this project exists
-
-Most "chat with your PDFs" GenAI portfolio projects look identical. This one
-is grounded in real industrial automation domain knowledge (PLC/SCADA/HMI)
-and is built to answer a hiring manager's actual questions: does the model
-know the right answer, is fine-tuning worth the cost over RAG alone, and what
-does it cost to run in production.
 
 ## Architecture
 
