@@ -44,17 +44,9 @@ local-GPU-vs-cloud-API cost/latency comparison.
    fine-tuned-no-RAG, fine-tuned+RAG) on accuracy/faithfulness, latency, and
    cost-per-query (local GPU vs. Groq cloud baseline), traced in Langfuse.
 
-## Status
 
-- [ ] Data collection & cleaning
-- [ ] Baseline RAG
-- [ ] QLoRA fine-tuning
-- [ ] CrewAI agent layer
-- [ ] Serving (local + Lambda)
-- [ ] Evaluation & cost comparison
-- [ ] Write-up
 
-## Hardware target
+## Hardware
 
 Local inference/fine-tuning on RTX 5080 (16GB VRAM). Qwen2.5-14B-Instruct at
 4-bit fits comfortably; QLoRA fine-tuning uses the same quantized base with
