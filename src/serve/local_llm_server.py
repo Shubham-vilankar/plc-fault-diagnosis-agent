@@ -1,12 +1,8 @@
 """
-Local OpenAI-compatible chat completions server, backed by the same
-transformers-based loading used in baseline_rag.py (not vLLM — sidesteps
-the vLLM V2 Model Runner / WSL2 UVA incompatibility hit during setup).
-
-This is a pragmatic stand-in for the agent-building stage. Revisit vLLM (or
-an updated version / different flags) at the actual production-serving
-stage — this server's job right now is just to give CrewAI something to
-talk to that speaks the standard chat-completions API shape.
+Local OpenAI-compatible chat completions server, backed by transformers
+(base model + LoRA adapter via peft) rather than vLLM — this project hit a
+vLLM V2 Model Runner / WSL2 UVA incompatibility during setup, so this
+FastAPI wrapper is the production path.
 
 Run with: uvicorn src.serve.local_llm_server:app --port 8001
 """
@@ -66,7 +62,7 @@ class ChatMessage(BaseModel):
 class ChatCompletionRequest(BaseModel):
     model: str = "fault-diagnosis"
     messages: list[ChatMessage]
-    max_tokens: int = 400
+    max_tokens: int = 300
     temperature: float = 0.3
 
 
@@ -88,9 +84,6 @@ def chat_completions(req: ChatCompletionRequest):
         output[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True
     )
 
-    # Standard OpenAI chat-completions response shape — this is what makes
-    # CrewAI (and anything else expecting an OpenAI-compatible API) work
-    # against this server without any special-casing.
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
         "object": "chat.completion",
