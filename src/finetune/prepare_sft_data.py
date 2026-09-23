@@ -5,13 +5,20 @@ from pathlib import Path
 
 
 """
-Stage 3a: Converting parsed FaultDocs into instruction/response pairs for QLoRA
+Stage 3a: Convert parsed FaultDocs into instruction/response pairs for QLoRA
 fine-tuning.
 
-With only ~265 real fault-code we are generating a few query phrasings per
-fault code (different ways a technician might ask about the same fault), it just gives the model more examples of the
-*response format and reasoning pattern* to learn from.
+IMPORTANT: docs are split into train/eval BEFORE generating query
+phrasings, and shuffled at the doc level. This guarantees no fault code
+appears in both train and eval in any form. An earlier version generated
+phrasings first and split the flat list of examples afterward — that let
+different wordings of the SAME fault code land on both sides, leaking the
+"answer" into training in disguise and making eval accuracy look better
+than real generalization.
 """
+
+
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -24,27 +31,15 @@ SYSTEM_PROMPT = """You are an industrial fault-diagnosis assistant for PLC/SCADA
 3. Remedy Steps
 4. Escalate to a technician? (yes/no, with reason)"""
 
-
 QUERY_TEMPLATES = [
     "Stop code {code} on my PLC, what does it mean?",
     "Getting fault {code} — what should I check?",
     "What's causing error {code} and how do I fix it?",
     "PLC is showing {code}, need help diagnosing this.",
-    "I see {code} on the HMI, what are the likely causes?",
-    "Troubleshooting {code} — what steps should I take?",
-    "My system threw {code}, what does that indicate?",
-    "How do I resolve fault code {code}?",
-    "how do i fix {code}?",
-    "{code}",
-    ]
+]
 
 
 def build_response(doc: FaultDoc) -> str:
-    """
-    this fucntion will Build a training-target response from the fault doc. Confidence and escalation are inferred conservatively from the source (high-confidence
-    table extractions get 'medium' confidence responses; low-confidence regex-extracted ones get 'low' and always escalate) — this keeps the
-    training targets honest rather than overclaiming certainty the source data doesn't support.
-    """
     confidence = "medium" if doc.confidence == "high" else "low"
     escalate = "no" if doc.confidence == "high" else "yes"
     escalate_reason = (
@@ -52,22 +47,30 @@ def build_response(doc: FaultDoc) -> str:
         if doc.confidence == "high"
         else "Source data for this fault was extracted with lower confidence — verify against the original manual before acting."
     )
+    if doc.remedy:
+        remedy_text = doc.remedy
+    else:
+        # Honest fallback ONLY if no remedy was captured in the source data — don't hallucinate a fix.
+        remedy_text = (
+            f"No specific corrective action was captured for this fault — "
+            f"refer to fault code {doc.code} in the source documentation "
+            f"({doc.metadata.get('file', 'reference manual')}) directly."
+        )
     return (
         f"1. Likely Cause\n   {doc.content}\n\n"
         f"2. Confidence\n   {confidence}\n\n"
-        f"3. Remedy Steps\n   Refer to fault code {doc.code} in the source documentation "
-        f"({doc.metadata.get('file', 'reference manual')}) for the specific corrective action.\n\n"
+        f"3. Remedy Steps\n   {remedy_text}\n\n"
         f"4. Escalate to a technician? ({escalate})\n   {escalate_reason}"
     )
 
 
 def build_sft_dataset(docs: list[FaultDoc], variations_per_doc: int = 2, seed: int = 42) -> list[dict]:
-    random.seed(seed)
+    rng = random.Random(seed)
     examples = []
     for doc in docs:
         if not doc.code:
             continue
-        templates = random.sample(QUERY_TEMPLATES, k=min(variations_per_doc, len(QUERY_TEMPLATES)))
+        templates = rng.sample(QUERY_TEMPLATES, k=min(variations_per_doc, len(QUERY_TEMPLATES)))
         response = build_response(doc)
         for template in templates:
             examples.append({
@@ -77,7 +80,7 @@ def build_sft_dataset(docs: list[FaultDoc], variations_per_doc: int = 2, seed: i
                     {"role": "assistant", "content": response},
                 ]
             })
-    random.shuffle(examples)
+    rng.shuffle(examples)
     return examples
 
 
@@ -89,12 +92,16 @@ if __name__ == "__main__":
     docs = load_all(raw_dir)
     print(f"Loaded {len(docs)} fault docs")
 
-    examples = build_sft_dataset(docs, variations_per_doc=2)
-    print(f"Generated {len(examples)} training examples")
+    # Split by fault DOC first, then generate phrasings 
 
-    # 90/10 train/eval split
-    split_idx = int(len(examples) * 0.9)
-    train_examples, eval_examples = examples[:split_idx], examples[split_idx:]
+    random.seed(42)
+    shuffled_docs = [d for d in docs if d.code]
+    random.shuffle(shuffled_docs)
+    split_idx = int(len(shuffled_docs) * 0.9)
+    train_docs, eval_docs = shuffled_docs[:split_idx], shuffled_docs[split_idx:]
+
+    train_examples = build_sft_dataset(train_docs, variations_per_doc=2)
+    eval_examples = build_sft_dataset(eval_docs, variations_per_doc=2)
 
     train_path = sft_dir / "train.jsonl"
     eval_path = sft_dir / "eval.jsonl"
@@ -106,5 +113,9 @@ if __name__ == "__main__":
         for ex in eval_examples:
             f.write(json.dumps(ex) + "\n")
 
+    train_codes = {d.code for d in train_docs}
+    eval_codes = {d.code for d in eval_docs}
+    overlap = train_codes & eval_codes
     print(f"Wrote {len(train_examples)} train / {len(eval_examples)} eval examples")
+    print(f"Train fault codes: {len(train_codes)}, Eval fault codes: {len(eval_codes)}, Overlap: {len(overlap)} (should be 0)")
     print(f"\nSample training example:\n{json.dumps(train_examples[0], indent=2)}")
