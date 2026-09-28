@@ -70,21 +70,21 @@ A small FastAPI server connects the model to CrewAI using the API format CrewAI 
 
 ```
                        ┌─────────────────────┐
-                       │   Knowledge Base     │
-                       │ (fault codes, SOPs,  │
-                       │  manuals) → Qdrant   │
-                       └──────────┬───────────┘
+                       │   Knowledge Base    │
+                       │ (fault codes, SOPs, │
+                       │  manuals) → Qdrant  │
+                       └──────────┬──────────┘
                                   │ retrieval
-┌───────────┐   query    ┌───────▼────────┐    ┌──────────────┐
-│  Lambda    ├───────────►  CrewAI Crew    ├───►│ Local LLM     │
-│ (API layer)│            │ - Retriever    │    │ Qwen2.5-14B   │
-└───────────┘            │ - Diagnostician│    │ QLoRA + 4-bit │
-                          │ - Escalator    │    │ (RTX 5080)    │
+┌───────────┐   query     ┌───────▼────────┐    ┌──────────────┐
+│  Lambda    ├───────────►  CrewAI Crew    ├───►│ Local LLM    │
+│ (API layer)│            │ - Retriever    │    │ Qwen2.5-14B  │
+└───────────┘             │ - Diagnostician│    │ QLoRA + 4-bit│
+                          │ - Escalator    │    │ (RTX 5080)   │
                           └───────┬────────┘    └──────────────┘
                                   │ traces
                           ┌───────▼────────┐
-                          │    Langfuse     │
-                          │ (self-hosted)   │
+                          │    Langfuse    │
+                          │ (self-hosted)  │
                           └────────────────┘
 ```
 
