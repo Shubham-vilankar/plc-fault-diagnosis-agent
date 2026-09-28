@@ -153,3 +153,9 @@ Built and tested on Python 3.11, WSL2 Ubuntu, RTX 5080 (16GB VRAM).
 Local inference/fine-tuning on RTX 5080 (16GB VRAM). Qwen2.5-14B-Instruct at
 4-bit fits comfortably; QLoRA fine-tuning uses the same quantized base with
 LoRA adapters via `peft` + `trl` + `bitsandbytes`.
+
+
+
+<video src="https://github.com/user-attachments/assets/d881308f-3c31-4f19-9240-4b3f49867a5e" controls="controls" style="max-width: 100%;">
+</video>
+
